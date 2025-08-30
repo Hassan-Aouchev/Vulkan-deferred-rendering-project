@@ -13,15 +13,45 @@ m_SwapChain(swapChain)
 {
     LoadPipelineCache();
 
-    CreateUniversalDescriptorSetLayout();
+    //CreateUniversalDescriptorSetLayout();
+
+    DescriptorSetLayoutBindingConfig uboBindingConfig;
+    uboBindingConfig.descriptorCount = 1;
+    uboBindingConfig.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboBindingConfig.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    DescriptorSetLayoutBindingConfig vertexBindingConfig;
+    vertexBindingConfig.descriptorCount = 1;
+    vertexBindingConfig.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    vertexBindingConfig.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    DescriptorSetLayoutBindingConfig materialBindingConfig;
+    materialBindingConfig.descriptorCount = 1;
+    materialBindingConfig.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    materialBindingConfig.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    DescriptorSetLayoutConfig setLayoutConfig;
+    setLayoutConfig.bindingNames = { "uboLayout","vertexLayout","materialLayout" };
+    setLayoutConfig.name = "Universal";
+
+    RenderPassBuilder builder{};
+    builder
+        .AddDescriptorSetLayoutBinding("uboLayout", uboBindingConfig)
+        .AddDescriptorSetLayoutBinding("vertexLayout", vertexBindingConfig)
+        .AddDescriptorSetLayoutBinding("materialLayout", materialBindingConfig)
+        .AddDescriptorSetLayout(setLayoutConfig);
+    builder.BuildRenderPass(device, resourceManager, swapChain, this);
+
+    m_UniversalDescriptorSetLayout = m_DescriptorSetLayouts["Universal"];
+
     CreateGBufferDescriptorSetLayout();
     CreateDepthPrepassDescriptorSetLayout();
+    CreateLightingDescriptorSetLayout();
+    CreateToneMappingDescriptorSetLayout();
 
     CreateDepthPrepassPipeline();
     CreateGBufferPipeline();
-    CreateLightingDescriptorSetLayout();
     CreateLightingPipeline();
-    CreateToneMappingDescriptorSetLayout();
     CreateToneMappingPipeline();
 
 }
@@ -55,17 +85,16 @@ PipelineManager::~PipelineManager()
 void PipelineManager::CreateDepthPrepassPipeline()
 {
 	auto vertShaderCode = readFile("CustomShaders/depthPrepass.vert.spv");
+    auto fragShaderCode = readFile("CustomShaders/depthPrepass.frag.spv");
 
 	VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
+    VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
 
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
 	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 	vertShaderStageInfo.module = vertShaderModule;
 	vertShaderStageInfo.pName = "main";
-
-	auto fragShaderCode = readFile("CustomShaders/depthPrepass.frag.spv");
-	VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
 
 	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
 	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -121,11 +150,6 @@ void PipelineManager::CreateDepthPrepassPipeline()
 	colorBlending.attachmentCount = 0; // No color attachments in depth prepass
 	colorBlending.pAttachments = nullptr;
 
-	VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	pushConstantRange.offset = 0;
-	pushConstantRange.size = sizeof(PushConstantData);
-
 	std::vector<VkDynamicState> dynamicStates = {
 		VK_DYNAMIC_STATE_VIEWPORT,
 		VK_DYNAMIC_STATE_SCISSOR
@@ -135,6 +159,11 @@ void PipelineManager::CreateDepthPrepassPipeline()
 	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
 	dynamicState.pDynamicStates = dynamicStates.data();
+
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(PushConstantData);
 
     std::array<VkDescriptorSetLayout, 2> depthSetLayouts = {
     m_UniversalDescriptorSetLayout,
@@ -155,7 +184,7 @@ void PipelineManager::CreateDepthPrepassPipeline()
     VkFormat depthFormat = m_ResourceManager->FindDepthFormat();
 
 	VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{};
-	pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+	pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 	pipelineRenderingCreateInfo.colorAttachmentCount = 0; // no colors
 	pipelineRenderingCreateInfo.pColorAttachmentFormats = nullptr;
 	pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat;
@@ -443,14 +472,14 @@ void PipelineManager::CreateLightingPipeline()
         throw std::runtime_error("failed to create Lighting pipeline layout!");
     }
 
-    VkFormat swapChainFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+    VkFormat hdrFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
 
 
 
     VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{};
     pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChainFormat;
+    pipelineRenderingCreateInfo.pColorAttachmentFormats = &hdrFormat;
     pipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
     pipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
@@ -847,8 +876,6 @@ void PipelineManager::LoadPipelineCache()
             std::cout << "existing pipeline cache is invalid. Creating new cache" << std::endl;
             initialCacheData.clear();
         }
-    } if (vkCreatePipelineCache(m_Device->GetDevice(), &CacheCreateInfo, nullptr, &m_PipelineCache) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create pipeline cache!");
     }
 
     CacheCreateInfo.initialDataSize = initialCacheData.size();
@@ -908,3 +935,84 @@ VkShaderModule PipelineManager::CreateShaderModule(const std::vector<uint32_t>& 
 
     return shaderModule;
 }
+
+void PipelineManager::AddDescriptorSetLayout(const std::string& name, VkDescriptorSetLayout layout)
+{
+    m_DescriptorSetLayouts[name] = layout;
+}
+
+void PipelineManager::AddDescriptorSetLayoutBinding(const std::string& name, const DescriptorSetLayoutBindingConfig& config)
+{
+    m_DescriptorSetLayoutBindings[name] = config;
+}
+
+#pragma region Builder
+
+RenderPassBuilder& RenderPassBuilder::AddDescriptorSetLayoutBinding(const std::string& name, DescriptorSetLayoutBindingConfig config)
+{
+    m_DescriptorSetLayoutBindings.insert({ name, config });
+
+    return *this;
+}
+
+RenderPassBuilder& RenderPassBuilder::AddDescriptorSetLayout(DescriptorSetLayoutConfig config)
+{
+    m_DescriptorSetLayoutsConfig.push_back(config);
+
+    return *this;
+}
+
+void RenderPassBuilder::BuildRenderPass(Device* device, ResourceManager* resourceManager, SwapChain* swapChain, PipelineManager* pipelineManager)
+{
+
+    for (const auto& [name, config] : m_DescriptorSetLayoutBindings) {
+        pipelineManager->AddDescriptorSetLayoutBinding(name, config);
+    }
+
+    for(const DescriptorSetLayoutConfig config :m_DescriptorSetLayoutsConfig)
+    {
+        VkDescriptorSetLayout descriptorSetLayout;
+
+        std::vector<VkDescriptorSetLayoutBinding> Bindings;
+        std::vector<VkDescriptorBindingFlags> BindingFlags;
+
+        for (const std::string& bindingName : config.bindingNames)
+        {
+            DescriptorSetLayoutBindingConfig bindingConfig = m_DescriptorSetLayoutBindings[bindingName];
+
+            if (bindingConfig.descriptorCount == 0 || bindingConfig.stageFlags == 0) {
+                throw std::runtime_error("binding layout not found");
+            }
+
+            VkDescriptorSetLayoutBinding layoutBinding;
+            layoutBinding.binding = Bindings.size();
+            layoutBinding.descriptorType = bindingConfig.descriptorType;
+            layoutBinding.descriptorCount = bindingConfig.descriptorCount;
+            layoutBinding.stageFlags = bindingConfig.stageFlags;
+
+            layoutBinding.pImmutableSamplers = nullptr;
+
+            Bindings.push_back(layoutBinding);
+            BindingFlags.push_back(0);
+        }
+
+        VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
+        bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+        bindingFlagsInfo.bindingCount = static_cast<uint32_t>(Bindings.size());
+        bindingFlagsInfo.pBindingFlags = BindingFlags.data();
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.pNext = &bindingFlagsInfo;
+        layoutInfo.bindingCount = static_cast<uint32_t>(Bindings.size());
+        layoutInfo.flags = config.layoutFlags;
+        layoutInfo.pBindings = Bindings.data();
+
+        if (vkCreateDescriptorSetLayout(device->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create universal descriptor set layout!");
+        }
+
+        pipelineManager->AddDescriptorSetLayout(config.name, descriptorSetLayout);
+    }
+}
+#pragma endregion Builder

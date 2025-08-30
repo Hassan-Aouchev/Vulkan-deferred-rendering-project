@@ -2,10 +2,28 @@
 #include <vulkan/vulkan.h>
 #include <fstream>
 #include <vector>
+#include <unordered_map>
 
 struct TonemappingPushConstants {
 	float averageLuminance;
 	int exposureMode;
+};
+struct PipelineResource {
+	VkPipeline pipeline;
+	VkPipelineLayout pipelineLayout;
+	std::vector<std::string> descriptorSetLayoutNames;
+};
+
+struct DescriptorSetLayoutBindingConfig {
+	VkDescriptorType descriptorType;
+	uint32_t descriptorCount;
+	VkShaderStageFlags stageFlags;
+	uint32_t bindingFlags;
+};
+struct DescriptorSetLayoutConfig {
+	std::string name;
+	VkDescriptorSetLayoutCreateFlags layoutFlags;
+	std::vector<std::string> bindingNames;
 };
 
 static std::vector<uint32_t> readFile(const std::string& filename) {
@@ -60,6 +78,22 @@ public:
 	VkPipelineLayout GetToneMappingPipelineLayout() const { return m_ToneMappingPipelineLayout; }
 
 	VkShaderModule CreateShaderModule(const std::vector<uint32_t>& code);
+
+	const std::unordered_map<std::string, VkDescriptorSetLayout>& GetDescriptorSetLayouts() const{ return m_DescriptorSetLayouts; }
+	const std::unordered_map<std::string, DescriptorSetLayoutBindingConfig>& GetDescriptorSetLayoutBindings() const { return m_DescriptorSetLayoutBindings; }
+
+	void AddDescriptorSetLayout(const std::string& name, VkDescriptorSetLayout layout);
+	void AddDescriptorSetLayoutBinding(const std::string& name, const DescriptorSetLayoutBindingConfig& config);
+
+	const VkDescriptorSetLayout GetDescriptorSetLayout(const std::string& name) const {
+		auto it = m_DescriptorSetLayouts.find(name);
+		return (it != m_DescriptorSetLayouts.end()) ? it->second : VkDescriptorSetLayout{};
+	}
+
+	const DescriptorSetLayoutBindingConfig GetDescriptorSetLayoutBinding(const std::string& name) const {
+		auto it = m_DescriptorSetLayoutBindings.find(name);
+		return (it != m_DescriptorSetLayoutBindings.end()) ? it->second : DescriptorSetLayoutBindingConfig{};
+	}
 private:
 	//(set 0 in both pipelines)
 	void CreateUniversalDescriptorSetLayout();
@@ -74,6 +108,10 @@ private:
 	void LoadPipelineCache();
 	void SavePipelineCache();
 
+
+	std::unordered_map<std::string, PipelineResource> m_Pipelines;
+	std::unordered_map<std::string, VkDescriptorSetLayout> m_DescriptorSetLayouts;
+	std::unordered_map<std::string, DescriptorSetLayoutBindingConfig> m_DescriptorSetLayoutBindings;
 
 	VkPipelineCache m_PipelineCache;
 	VkDescriptorSetLayout m_UniversalDescriptorSetLayout;
@@ -99,4 +137,29 @@ private:
 	ResourceManager* m_ResourceManager;
 	SwapChain* m_SwapChain;
 	Device* m_Device;
+
+
+};
+
+class RenderPassBuilder
+{
+public:
+	RenderPassBuilder() {};
+
+	RenderPassBuilder& AddRenderPass(const std::string& name, const std::string& vertexFileName, const std::string fragmentFileName);
+	RenderPassBuilder& AddDescriptorSetLayoutBinding(const std::string& name, DescriptorSetLayoutBindingConfig config);
+	RenderPassBuilder& AddDescriptorSetLayout(DescriptorSetLayoutConfig config);
+	RenderPassBuilder& AddBindlessDescriptorSetLayout(const std::string& setLayoutName, const std::string& bindingName, DescriptorSetLayoutBindingConfig bindingConfig);
+	void BuildRenderPass(Device* device, ResourceManager* resourceManager, SwapChain* swapChain, PipelineManager* pipelineManager);
+
+private:
+	
+	std::string m_Name;
+
+	PipelineResource m_Pipeline;
+
+	std::vector<DescriptorSetLayoutConfig> m_DescriptorSetLayoutsConfig;
+
+	std::unordered_map<std::string, DescriptorSetLayoutBindingConfig> m_DescriptorSetLayoutBindings;
+
 };
