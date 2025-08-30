@@ -11,16 +11,7 @@ PipelineManager::PipelineManager(Device* device, ResourceManager* resourceManage
 m_ResourceManager(resourceManager),
 m_SwapChain(swapChain)
 {
-    VkPipelineCacheCreateInfo pipelineCacheInfo{};
-    pipelineCacheInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-    pipelineCacheInfo.pNext = nullptr;
-    pipelineCacheInfo.flags = 0;
-    pipelineCacheInfo.initialDataSize = 0;
-    pipelineCacheInfo.pInitialData = nullptr;
-
-    if (vkCreatePipelineCache(m_Device->GetDevice(), &pipelineCacheInfo, nullptr, &m_PipelineCache) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create pipeline cache!");
-    }
+    LoadPipelineCache();
 
     CreateUniversalDescriptorSetLayout();
     CreateGBufferDescriptorSetLayout();
@@ -805,6 +796,66 @@ void PipelineManager::CreateLightingDescriptorSetLayout()
 
     if (vkCreateDescriptorSetLayout(m_Device->GetDevice(), &layoutInfo, nullptr, &m_LightingDescriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create lighting descriptor set layout!");
+    }
+}
+
+void PipelineManager::LoadPipelineCache()
+{
+    std::vector<uint8_t> initialCacheData;
+
+    VkPipelineCacheCreateInfo CacheCreateInfo{};
+    CacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+
+    std::string readFileName = "pipeline_cache_data.bin";
+    FILE* pReadFile = fopen(readFileName.c_str(), "rb");
+
+    if (pReadFile) {
+        fseek(pReadFile, 0, SEEK_END);
+        long fileSize = ftell(pReadFile);
+        rewind(pReadFile);
+
+        initialCacheData.resize(fileSize);
+        if (fread(initialCacheData.data(), 1, fileSize, pReadFile) != fileSize) {
+            std::cerr << "Failed to read pipeline cache file" << std::endl;
+            initialCacheData.clear();
+        }
+
+        fclose(pReadFile);
+        printf(" Pipeline cache HIT!\n");
+        printf(" cacheData loaded from %s\n", readFileName.c_str());
+    }
+    else
+    {
+        printf(" Pipeline cache miss!\n");
+    }
+
+    if (!initialCacheData.empty()) {
+        VkPipelineCacheHeaderVersionOne* header =
+            reinterpret_cast<VkPipelineCacheHeaderVersionOne*>(initialCacheData.data());
+
+        bool isValideCache =
+            header->headerSize == sizeof(VkPipelineCacheHeaderVersionOne) &&
+            header->headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE;
+
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &deviceProperties);
+
+        isValideCache &= (header->vendorID == deviceProperties.vendorID);
+        isValideCache &= (header->deviceID == deviceProperties.deviceID);
+
+        if (!isValideCache) {
+            std::cout << "existing pipeline cache is invalid. Creating new cache" << std::endl;
+            initialCacheData.clear();
+        }
+    } if (vkCreatePipelineCache(m_Device->GetDevice(), &CacheCreateInfo, nullptr, &m_PipelineCache) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create pipeline cache!");
+    }
+
+    CacheCreateInfo.initialDataSize = initialCacheData.size();
+    CacheCreateInfo.pInitialData = initialCacheData.empty() ? nullptr : initialCacheData.data();
+
+    if (vkCreatePipelineCache(m_Device->GetDevice(), &CacheCreateInfo, nullptr, &m_PipelineCache) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create pipeline cache!");
     }
 }
 

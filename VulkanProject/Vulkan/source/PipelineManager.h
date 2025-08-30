@@ -71,6 +71,7 @@ private:
 	void CreateToneMappingDescriptorSetLayout();
 
 	void CreateLightingDescriptorSetLayout();
+	void LoadPipelineCache();
 	void SavePipelineCache();
 
 
