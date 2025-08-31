@@ -8,9 +8,62 @@ struct TonemappingPushConstants {
 	float averageLuminance;
 	int exposureMode;
 };
+
+struct PushConstantConfig {
+	VkShaderStageFlags stageFlags = 0;
+	uint32_t offset = 0;
+	uint32_t size = 0;
+};
+
 struct PipelineResource {
 	VkPipeline pipeline;
 	VkPipelineLayout pipelineLayout;
+};
+
+struct PipelineLayoutConfig {
+	std::string name;
+
+	std::string vertShaderName;
+	std::string fragShaderName;
+	enum class CullMode {
+		None = 0,
+		Front = 1,
+		Back = 2,
+		FrontAndBack = 3,
+	} cullMode;
+	
+	bool depthTestEnable = false;
+
+	bool depthWriteEnable = false;
+	bool clockwise = false;
+
+	enum class DepthCompareOp {
+		Never = 0,
+		Less = 1,
+		Equal = 2,
+		LessOrEqual = 3,
+		Greater = 4,
+		NotEqual = 5,
+		GreaterOrEqual = 6,
+		Always = 7
+	} depthCompareOp;
+
+	enum class Formats {
+		R8G8B8A8_UNORM,
+		R32G32B32A32_SFLOAT,
+		R8G8B8A8_SRGB
+	};
+
+	struct Output
+	{
+		std::string name;
+		Formats format;
+	};
+
+	std::vector <Output> Outputs;
+
+	std::vector<std::string> PushConstants;
+
 	std::vector<std::string> descriptorSetLayoutNames;
 };
 
@@ -18,11 +71,12 @@ struct DescriptorSetLayoutBindingConfig {
 	VkDescriptorType descriptorType;
 	uint32_t descriptorCount;
 	VkShaderStageFlags stageFlags;
-	uint32_t bindingFlags;
+	uint32_t bindingFlags = 0;
 };
+
 struct DescriptorSetLayoutConfig {
 	std::string name;
-	VkDescriptorSetLayoutCreateFlags layoutFlags;
+	VkDescriptorSetLayoutCreateFlags layoutFlags = 0;
 	std::vector<std::string> bindingNames;
 };
 
@@ -84,6 +138,7 @@ public:
 
 	void AddDescriptorSetLayout(const std::string& name, VkDescriptorSetLayout layout);
 	void AddDescriptorSetLayoutBinding(const std::string& name, const DescriptorSetLayoutBindingConfig& config);
+	void AddPipelineResource(const std::string& name, VkPipeline pipeline, VkPipelineLayout pipelineLayout);
 
 	const VkDescriptorSetLayout GetDescriptorSetLayout(const std::string& name) const {
 		auto it = m_DescriptorSetLayouts.find(name);
@@ -94,6 +149,15 @@ public:
 		auto it = m_DescriptorSetLayoutBindings.find(name);
 		return (it != m_DescriptorSetLayoutBindings.end()) ? it->second : DescriptorSetLayoutBindingConfig{};
 	}
+
+	const PipelineResource GetPipeline(const std::string& name) const {
+		auto it = m_Pipelines.find(name);
+		return (it != m_Pipelines.end()) ? it->second : PipelineResource{};
+	}
+
+	const PushConstantConfig& GetPushConstantConfig()const { return m_PushConstantConfig; }
+
+	VkPipelineCache m_PipelineCache;
 private:
 	//(set 0 in both pipelines)
 	void CreateUniversalDescriptorSetLayout();
@@ -110,10 +174,14 @@ private:
 
 
 	std::unordered_map<std::string, PipelineResource> m_Pipelines;
+
+	std::unordered_map<std::string, PipelineLayoutConfig> m_PipelineConfigs;
+
+	PushConstantConfig m_PushConstantConfig;
+
 	std::unordered_map<std::string, VkDescriptorSetLayout> m_DescriptorSetLayouts;
 	std::unordered_map<std::string, DescriptorSetLayoutBindingConfig> m_DescriptorSetLayoutBindings;
 
-	VkPipelineCache m_PipelineCache;
 	VkDescriptorSetLayout m_UniversalDescriptorSetLayout;
 	VkDescriptorSetLayout m_GBufferDescriptorSetLayout;
 	VkDescriptorSetLayout m_DepthPrepassDescriptorSetLayout;
@@ -141,25 +209,22 @@ private:
 
 };
 
-class RenderPassBuilder
+class PipelineBuilder
 {
 public:
-	RenderPassBuilder() {};
+	PipelineBuilder() {};
 
-	RenderPassBuilder& AddRenderPass(const std::string& name, const std::string& vertexFileName, const std::string fragmentFileName);
-	RenderPassBuilder& AddDescriptorSetLayoutBinding(const std::string& name, DescriptorSetLayoutBindingConfig config);
-	RenderPassBuilder& AddDescriptorSetLayout(DescriptorSetLayoutConfig config);
-	RenderPassBuilder& AddBindlessDescriptorSetLayout(const std::string& setLayoutName, const std::string& bindingName, DescriptorSetLayoutBindingConfig bindingConfig);
-	void BuildRenderPass(Device* device, ResourceManager* resourceManager, SwapChain* swapChain, PipelineManager* pipelineManager);
+	PipelineBuilder& AddPipeline(PipelineLayoutConfig& config);
+	PipelineBuilder& AddDescriptorSetLayoutBinding(const std::string& name, DescriptorSetLayoutBindingConfig config);
+	PipelineBuilder& AddDescriptorSetLayout(DescriptorSetLayoutConfig config);
+	void BuildPipeline(Device* device, ResourceManager* resourceManager, SwapChain* swapChain, PipelineManager* pipelineManager);
 
 private:
-	
-	std::string m_Name;
-
-	PipelineResource m_Pipeline;
-
 	std::vector<DescriptorSetLayoutConfig> m_DescriptorSetLayoutsConfig;
+
+	std::vector<PipelineLayoutConfig> m_PipelineLayoutConfig;
 
 	std::unordered_map<std::string, DescriptorSetLayoutBindingConfig> m_DescriptorSetLayoutBindings;
 
+	VkShaderModule CreateShaderModule(const std::vector<uint32_t>& code, Device* device);
 };

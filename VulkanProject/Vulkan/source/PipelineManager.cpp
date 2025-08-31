@@ -13,7 +13,9 @@ m_SwapChain(swapChain)
 {
     LoadPipelineCache();
 
-    //CreateUniversalDescriptorSetLayout();
+    m_PushConstantConfig.offset = 0;
+    m_PushConstantConfig.size = sizeof(PushConstantData);
+    m_PushConstantConfig.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     DescriptorSetLayoutBindingConfig uboBindingConfig;
     uboBindingConfig.descriptorCount = 1;
@@ -30,26 +32,62 @@ m_SwapChain(swapChain)
     materialBindingConfig.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     materialBindingConfig.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    DescriptorSetLayoutConfig setLayoutConfig;
-    setLayoutConfig.bindingNames = { "uboLayout","vertexLayout","materialLayout" };
-    setLayoutConfig.name = "Universal";
+    DescriptorSetLayoutBindingConfig textureBindingConfig;
+    textureBindingConfig.descriptorCount = 5000;
+    textureBindingConfig.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    textureBindingConfig.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    textureBindingConfig.bindingFlags =
+        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+        VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
 
-    RenderPassBuilder builder{};
+    DescriptorSetLayoutConfig universalSetLayoutConfig;
+    universalSetLayoutConfig.bindingNames = { "uboLayout","vertexLayout","materialLayout" };
+    universalSetLayoutConfig.name = "Universal";
+
+    DescriptorSetLayoutConfig textureSetLayoutConfig;
+    textureSetLayoutConfig.bindingNames = { "textureLayout" };
+    textureSetLayoutConfig.name = "Textures";
+    textureSetLayoutConfig.layoutFlags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+
+    DescriptorSetLayoutConfig alphaTextureSetLayoutConfig;
+    alphaTextureSetLayoutConfig.bindingNames = { "textureLayout" };
+    alphaTextureSetLayoutConfig.name = "AlphaTextures";
+    alphaTextureSetLayoutConfig.layoutFlags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+
+    PipelineLayoutConfig pipelineLayoutConfig{};
+    pipelineLayoutConfig.cullMode = PipelineLayoutConfig::CullMode::Back;
+    pipelineLayoutConfig.depthCompareOp = PipelineLayoutConfig::DepthCompareOp::Less;
+    pipelineLayoutConfig.depthTestEnable = true;
+    pipelineLayoutConfig.depthWriteEnable = true;
+    pipelineLayoutConfig.descriptorSetLayoutNames = { "Universal","AlphaTextures" };
+    pipelineLayoutConfig.fragShaderName = "CustomShaders/depthPrepass.frag.spv";
+    pipelineLayoutConfig.vertShaderName = "CustomShaders/depthPrepass.vert.spv";
+    pipelineLayoutConfig.name = "DepthPrepass";
+    pipelineLayoutConfig.clockwise = false;
+
+    PipelineBuilder builder{};
     builder
         .AddDescriptorSetLayoutBinding("uboLayout", uboBindingConfig)
         .AddDescriptorSetLayoutBinding("vertexLayout", vertexBindingConfig)
         .AddDescriptorSetLayoutBinding("materialLayout", materialBindingConfig)
-        .AddDescriptorSetLayout(setLayoutConfig);
-    builder.BuildRenderPass(device, resourceManager, swapChain, this);
+        .AddDescriptorSetLayoutBinding("textureLayout", textureBindingConfig)
+        .AddDescriptorSetLayout(universalSetLayoutConfig)
+        .AddDescriptorSetLayout(textureSetLayoutConfig)
+        .AddDescriptorSetLayout(alphaTextureSetLayoutConfig)
+        .AddPipeline(pipelineLayoutConfig);
+    builder.BuildPipeline(device, resourceManager, swapChain, this);
 
     m_UniversalDescriptorSetLayout = m_DescriptorSetLayouts["Universal"];
+    m_GBufferDescriptorSetLayout = m_DescriptorSetLayouts["Textures"];
+    m_DepthPrepassDescriptorSetLayout = m_DescriptorSetLayouts["AlphaTextures"];
 
-    CreateGBufferDescriptorSetLayout();
-    CreateDepthPrepassDescriptorSetLayout();
+    m_DepthPrepassPipeline = GetPipeline("DepthPrepass").pipeline;
+    m_DepthPrepassPipelineLayout = GetPipeline("DepthPrepass").pipelineLayout;
+
     CreateLightingDescriptorSetLayout();
     CreateToneMappingDescriptorSetLayout();
 
-    CreateDepthPrepassPipeline();
     CreateGBufferPipeline();
     CreateLightingPipeline();
     CreateToneMappingPipeline();
@@ -104,12 +142,6 @@ void PipelineManager::CreateDepthPrepassPipeline()
 
     VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
-	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr;
-	vertexInputInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputInfo.pVertexAttributeDescriptions = nullptr;
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -195,7 +227,7 @@ void PipelineManager::CreateDepthPrepassPipeline()
 	pipelineInfo.pNext = &pipelineRenderingCreateInfo;
 	pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
-	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pVertexInputState =nullptr;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
@@ -946,23 +978,53 @@ void PipelineManager::AddDescriptorSetLayoutBinding(const std::string& name, con
     m_DescriptorSetLayoutBindings[name] = config;
 }
 
+void PipelineManager::AddPipelineResource(const std::string& name, VkPipeline pipeline, VkPipelineLayout pipelineLayout)
+{
+    PipelineResource& pipelineResource = m_Pipelines[name];
+    pipelineResource.pipeline = pipeline;
+    pipelineResource.pipelineLayout = pipelineLayout;
+}
+
 #pragma region Builder
 
-RenderPassBuilder& RenderPassBuilder::AddDescriptorSetLayoutBinding(const std::string& name, DescriptorSetLayoutBindingConfig config)
+PipelineBuilder& PipelineBuilder::AddPipeline(PipelineLayoutConfig& config)
+{
+    m_PipelineLayoutConfig.push_back(std::move(config));
+
+    return *this;
+}
+
+PipelineBuilder& PipelineBuilder::AddDescriptorSetLayoutBinding(const std::string& name, DescriptorSetLayoutBindingConfig config)
 {
     m_DescriptorSetLayoutBindings.insert({ name, config });
 
     return *this;
 }
 
-RenderPassBuilder& RenderPassBuilder::AddDescriptorSetLayout(DescriptorSetLayoutConfig config)
+PipelineBuilder& PipelineBuilder::AddDescriptorSetLayout(DescriptorSetLayoutConfig config)
 {
     m_DescriptorSetLayoutsConfig.push_back(config);
 
     return *this;
 }
 
-void RenderPassBuilder::BuildRenderPass(Device* device, ResourceManager* resourceManager, SwapChain* swapChain, PipelineManager* pipelineManager)
+
+VkShaderModule PipelineBuilder::CreateShaderModule(const std::vector<uint32_t>& code,Device* device)
+{
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = code.size() * sizeof(uint32_t);  // Convert to bytes
+    createInfo.pCode = code.data();
+
+    VkShaderModule shaderModule;
+    if (vkCreateShaderModule(device->GetDevice(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create shader module!");
+    }
+
+    return shaderModule;
+}
+
+void PipelineBuilder::BuildPipeline(Device* device, ResourceManager* resourceManager, SwapChain* swapChain, PipelineManager* pipelineManager)
 {
 
     for (const auto& [name, config] : m_DescriptorSetLayoutBindings) {
@@ -981,7 +1043,11 @@ void RenderPassBuilder::BuildRenderPass(Device* device, ResourceManager* resourc
             DescriptorSetLayoutBindingConfig bindingConfig = m_DescriptorSetLayoutBindings[bindingName];
 
             if (bindingConfig.descriptorCount == 0 || bindingConfig.stageFlags == 0) {
-                throw std::runtime_error("binding layout not found");
+                bindingConfig = pipelineManager->GetDescriptorSetLayoutBinding(bindingName);
+
+                if (bindingConfig.descriptorCount == 0 || bindingConfig.stageFlags == 0) {
+                    throw std::runtime_error("binding layout not found");
+                }
             }
 
             VkDescriptorSetLayoutBinding layoutBinding;
@@ -993,7 +1059,7 @@ void RenderPassBuilder::BuildRenderPass(Device* device, ResourceManager* resourc
             layoutBinding.pImmutableSamplers = nullptr;
 
             Bindings.push_back(layoutBinding);
-            BindingFlags.push_back(0);
+            BindingFlags.push_back(bindingConfig.bindingFlags);
         }
 
         VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
@@ -1009,10 +1075,237 @@ void RenderPassBuilder::BuildRenderPass(Device* device, ResourceManager* resourc
         layoutInfo.pBindings = Bindings.data();
 
         if (vkCreateDescriptorSetLayout(device->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create universal descriptor set layout!");
+            throw std::runtime_error("Failed to create " + config.name + " descriptor set layout!");
         }
 
         pipelineManager->AddDescriptorSetLayout(config.name, descriptorSetLayout);
     }
+
+    for(const PipelineLayoutConfig& config : m_PipelineLayoutConfig)
+    {
+
+        auto vertShaderCode = readFile(config.vertShaderName);
+        auto fragShaderCode = readFile(config.fragShaderName);
+
+
+        VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode,device);
+        VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode,device);
+
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertShaderStageInfo.module = vertShaderModule;
+        vertShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragShaderStageInfo.module = fragShaderModule;
+        fragShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.scissorCount = 1;
+
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.depthClampEnable = VK_FALSE;
+        rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 1.0f;
+        using CullMode = PipelineLayoutConfig::CullMode;
+        switch (config.cullMode)
+        {
+        case CullMode::None:
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+            break;
+        case CullMode::Front:
+            rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+            break;
+        case CullMode::Back:
+            rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+            break;
+        case CullMode::FrontAndBack:
+            rasterizer.cullMode = VK_CULL_MODE_FRONT_AND_BACK;
+            break;
+        default:
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+            break;
+        }
+        rasterizer.frontFace = config.clockwise ? VK_FRONT_FACE_CLOCKWISE :VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterizer.depthBiasEnable = VK_FALSE;
+
+        VkPipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineDepthStencilStateCreateInfo depthStencil{};
+        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable = config.depthTestEnable? VK_TRUE:VK_FALSE;
+        depthStencil.depthWriteEnable = config.depthWriteEnable ? VK_TRUE : VK_FALSE;
+        using DepthCompareOp = PipelineLayoutConfig::DepthCompareOp;
+        switch (config.depthCompareOp)
+        {
+        case DepthCompareOp::Never:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
+            break;
+        case DepthCompareOp::Less:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+            break;
+        case DepthCompareOp::Equal:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_EQUAL;
+            break;
+        case DepthCompareOp::LessOrEqual:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+            break;
+        case DepthCompareOp::Greater:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_GREATER;
+            break;
+        case DepthCompareOp::NotEqual:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_NOT_EQUAL;
+            break;
+        case DepthCompareOp::GreaterOrEqual:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+            break;
+        case DepthCompareOp::Always:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+            break;
+        default:
+            depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
+            break;
+        }
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.minDepthBounds = VK_FALSE;
+
+        std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments{};
+
+        for (const auto& outputs : config.Outputs)
+        {
+            VkPipelineColorBlendAttachmentState colorBlendAttachment;
+
+            colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            colorBlendAttachment.blendEnable = VK_FALSE;
+
+            colorBlendAttachments.push_back(colorBlendAttachment);
+        }
+
+        VkPipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.attachmentCount = static_cast<uint32_t>(colorBlendAttachments.size());
+        colorBlending.pAttachments = colorBlendAttachments.data();
+
+        std::vector<VkDynamicState> dynamicStates = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR
+        };
+
+        VkPipelineDynamicStateCreateInfo dynamicState{};
+        dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+        dynamicState.pDynamicStates = dynamicStates.data();
+
+        PushConstantConfig pCConfig = pipelineManager->GetPushConstantConfig();
+
+        VkPushConstantRange pushConstantRange{};
+        pushConstantRange.stageFlags = pCConfig.stageFlags;
+        pushConstantRange.offset = pCConfig.offset;
+        pushConstantRange.size = pCConfig.size;
+
+        std::vector<VkDescriptorSetLayout> setLayouts{};
+
+        for (const std::string& name : config.descriptorSetLayoutNames)
+        {
+            setLayouts.emplace_back(pipelineManager->GetDescriptorSetLayout(name));
+        }
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+        pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+        pipelineLayoutInfo.pushConstantRangeCount = 1;
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+
+        VkPipelineLayout pipelineLayout;
+
+        if (vkCreatePipelineLayout(device->GetDevice(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create " + config.name + " pipeline layout!");
+        }
+
+        std::vector<VkFormat> colorFormats;
+        
+        using Formats = PipelineLayoutConfig::Formats;
+
+        for (const auto& format : config.Outputs)
+        {
+            switch (format.format)
+            {
+            case PipelineLayoutConfig::Formats::R8G8B8A8_UNORM:
+                colorFormats.emplace_back(VK_FORMAT_R8G8B8A8_UNORM);
+                break;
+            case PipelineLayoutConfig::Formats::R32G32B32A32_SFLOAT:
+                colorFormats.emplace_back(VK_FORMAT_R32G32B32A32_SFLOAT);
+                break;
+            case PipelineLayoutConfig::Formats::R8G8B8A8_SRGB:
+                colorFormats.emplace_back(VK_FORMAT_R8G8B8A8_SRGB);
+                break;
+            default:
+                break;
+            }
+        }
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+        VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{};
+        pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        pipelineRenderingCreateInfo.colorAttachmentCount = colorFormats.size();
+        pipelineRenderingCreateInfo.pColorAttachmentFormats = colorFormats.data();
+        pipelineRenderingCreateInfo.depthAttachmentFormat = resourceManager->FindDepthFormat();
+        pipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.pNext = &pipelineRenderingCreateInfo;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pDepthStencilState = &depthStencil;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.pDynamicState = &dynamicState;
+        pipelineInfo.layout = pipelineLayout;
+        pipelineInfo.renderPass = nullptr;
+        pipelineInfo.subpass = 0;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+        VkPipeline pipeline;
+
+        if (vkCreateGraphicsPipelines(device->GetDevice(), pipelineManager->m_PipelineCache, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create " + config.name+ " pipeline!");
+        }
+
+        pipelineManager->AddPipelineResource(config.name, pipeline, pipelineLayout);
+
+        vkDestroyShaderModule(device->GetDevice(), fragShaderModule, nullptr);
+        vkDestroyShaderModule(device->GetDevice(), vertShaderModule, nullptr);
+    }
+
 }
 #pragma endregion Builder

@@ -241,7 +241,7 @@ void Renderer::RenderDepthPrepass(VkCommandBuffer commandBuffer)
 
     // Bind depth prepass pipeline
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        m_PipelineManager->GetDepthPrepassPipeline());
+        m_PipelineManager->GetPipeline("DepthPrepass").pipeline);
 
     // Draw all objects
     vkCmdBindIndexBuffer(commandBuffer, m_ResourceManager->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
