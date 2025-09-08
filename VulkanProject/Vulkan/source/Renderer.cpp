@@ -34,11 +34,11 @@ Renderer::~Renderer()
         vkDestroySemaphore(m_Device->GetDevice(), m_RenderFinishedSemaphores[i], nullptr);
         vkDestroyFence(m_Device->GetDevice(), m_InFlightFences[i], nullptr);
     }
-
 }
 
 void Renderer::UpdatePushConstants(VkCommandBuffer commandBuffer)
 {
+
 }
 
 float Renderer::UpdateUniformBuffer(uint32_t currentImage)
@@ -76,8 +76,8 @@ float Renderer::UpdateUniformBuffer(uint32_t currentImage)
 
     ubo.resolution = glm::ivec2(m_SwapChain->GetSwapChainExtent().width, m_SwapChain->GetSwapChainExtent().height);
     ubo.proj[1][1] *= -1; // Flip Y-axis for Vulkan coordinate system
-
-    memcpy(m_ResourceManager->GetUniformBuffersMapped()[currentImage], &ubo, sizeof(ubo));
+    Buffer* uniformBuffer = m_ResourceManager->GetBuffer("Uniform",currentImage);
+    memcpy(uniformBuffer->mappedMemory, &ubo, sizeof(ubo));
 
     return deltaTime;
 }

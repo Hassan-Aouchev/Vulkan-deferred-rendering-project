@@ -9,6 +9,123 @@
 #include <array>
 #include <string>
 #include <iostream>
+#include <unordered_map>
+#include "../../Common/Types.h"
+
+
+enum class BufferBindFlags {
+    Undefined = 0,
+    VertexBuffer = BIT(0),
+    IndexBuffer = BIT(1),
+    UniformBuffer = BIT(2),
+    StorageBuffer = BIT(3)
+};
+ENUM_CLASS_FLAGS(BufferBindFlags)
+
+struct BufferData {
+    uint32_t dataSize;
+    uint32_t offsetStart;
+    const void* data = nullptr;
+};
+
+struct BufferDesc {
+    std::string name;
+
+    BufferData bufferData;
+    uint32_t bufferSize = 0;
+    uint32_t structuredByteStride = 0;
+    BufferBindFlags bindFlags{};
+};
+
+enum class TextureBindFlags {
+    Undefined = 0,
+    Read = BIT(0),
+    Write = BIT(1),
+    ReadWrite = (Read | Write),
+    Color = BIT(2),
+    Depth = BIT(3)
+};
+ENUM_CLASS_FLAGS(TextureBindFlags)
+
+enum class FilterMode {
+    Linear,
+    Nearest,
+    Cubic
+};
+
+enum class SamplerAddressMode {
+    Repeat,
+    MirroredRepeat,
+    ClampToEdge,
+    ClampToBorder
+};
+enum class Format {
+    R8,
+    R8G8,
+    R8G8B8,
+    R8G8B8A8,
+
+    R16F,
+    R16G16F,
+    R16G16B16F,
+    R16G16B16A16F,
+
+    R32F,
+    R32G32F,
+    R32G32B32F,
+    R32G32B32A32F,
+
+    D16,
+    D24,
+    D32F,
+    S8,
+    D24S8,
+    D32FS8
+};
+
+struct TextureDesc {
+    std::string name;
+    TextureBindFlags bindflags{};
+    uint32_t width;
+    uint32_t height;
+    Format format = Format::R8G8B8A8;
+};
+
+struct SamplerDesc {
+    std::string name;
+    SamplerAddressMode addressModeU{};
+    SamplerAddressMode addressModeV{};
+    SamplerAddressMode addressModeW{};
+    FilterMode samplerFilterMode{};
+    bool enableAnisotropy = false;
+    uint32_t maxAnisotropy = 16;
+
+    bool operator==(const SamplerDesc& other) const {
+        return addressModeU == other.addressModeU &&
+            addressModeV == other.addressModeV &&
+            addressModeW == other.addressModeW &&
+            samplerFilterMode == other.samplerFilterMode &&
+            enableAnisotropy == other.enableAnisotropy &&
+            maxAnisotropy == other.maxAnisotropy;
+    }
+};
+
+struct BindlessTextureDesc {
+    std::string name;
+    std::string path;
+    Format format = Format::R8G8B8A8;
+
+    uint32_t arrayIndex = 0;
+};
+
+struct Buffer {
+    BufferDesc bufferDesc;
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+    void* mappedMemory = nullptr;
+
+    int frameIndex;
+};
 
 struct GpuMaterial {
     alignas(4) uint32_t baseColorTextureIndex;
@@ -145,7 +262,6 @@ private:
 
 
     void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-    void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, Image& image, VkDeviceMemory& imageMemory);
 
     void CleanupGBuffer();
@@ -154,22 +270,9 @@ private:
 	std::vector<Texture> m_Textures;
     std::vector<Texture> m_AlphaTextures;
 
-    VkBuffer m_VertexBuffer;
-    VkDeviceMemory m_VertexBufferMemory;
-
-    VkBuffer m_MaterialBuffer;
-    VkDeviceMemory m_MaterialBufferMemory;
-
     VkBuffer m_LightingBuffer;
     VkDeviceMemory m_LightingBufferMemory;
     void* m_LightingUniformBufferMapped;
-
-    VkBuffer m_IndexBuffer;
-    VkDeviceMemory m_IndexBufferMemory;
-
-    std::vector<VkBuffer> m_UniformBuffers;
-    std::vector<VkDeviceMemory> m_UniformBuffersMemory;
-    std::vector<void*> m_UniformBuffersMapped;
 
     VkDescriptorPool m_DescriptorPool;
     std::vector<VkDescriptorSet> m_UniversalDescriptorSets;
@@ -201,6 +304,8 @@ private:
 
     GBuffer m_GBuffer;
     Texture m_HdrBuffer;
+
+    std::unordered_map<std::string, std::vector<Buffer*>> m_Buffers;
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
 public:
@@ -251,6 +356,7 @@ public:
 
     void Create(SwapChain* swapChain, PipelineManager* pipelineManager);
     void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+    void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
 	void SetModelMatrix(const glm::mat4& model,int index) {
 		m_PushConstants[index].model = model;
@@ -262,10 +368,9 @@ public:
     std::vector<LightingSSBO>& GetLights() { return m_Lights; }
     void AddPointLight(glm::vec3 position, glm::vec3 color, float lumen, float lux);
     void AddDirectionalLight(glm::vec3 direction, glm::vec3 color, float lumen, float lux);
-	std::vector<void*> GetUniformBuffersMapped() { return m_UniformBuffersMapped;}
-	VkBuffer GetVertexBuffer() const { return m_VertexBuffer;}
-    VkBuffer GetMaterialBuffer() const { return m_MaterialBuffer;}
-	VkBuffer GetIndexBuffer() const { return m_IndexBuffer; }
+    VkBuffer GetVertexBuffer() { return GetBuffer("Vertex", -1)->buffer; }
+    VkBuffer GetMaterialBuffer() { return GetBuffer("Material",-1)->buffer; }
+	VkBuffer GetIndexBuffer() { return GetBuffer("Index", -1)->buffer; }
     VkDescriptorSet GetUniversalDescriptorSet(size_t frameIndex) const {
         return m_UniversalDescriptorSets[frameIndex];
     }
@@ -306,4 +411,78 @@ public:
     void CleanDepth();
 
     uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+    void AddBuffer(const std::string& name, Buffer* buffer) {
+        auto it = m_Buffers.find(name);
+        int frameIndex = buffer->frameIndex;
+
+        if (it == m_Buffers.end()) {
+            if (frameIndex == -1) {
+                // Single buffer
+                m_Buffers[name] = { buffer };
+            }
+            else {
+                std::vector<Buffer*> buffers(MAX_FRAMES_IN_FLIGHT, nullptr);
+                buffers[frameIndex] = buffer;
+                m_Buffers[name] = std::move(buffers);
+            }
+        }
+        else {
+            if (frameIndex == -1) {
+                it->second = { buffer };
+            }
+            else {
+                if (it->second.size() <= frameIndex) {
+                    it->second.resize(frameIndex + 1, nullptr);
+                }
+                it->second[frameIndex] = buffer;
+            }
+        }
+    }
+
+    Buffer* GetBuffer(const std::string& name,int frameIndex) {
+        auto it = m_Buffers.find(name);
+        if (it != m_Buffers.end()) {
+            if (it->second.size() == 1) {
+                return it->second[0];
+            }
+            else {
+                return it->second[frameIndex];
+            }
+        }
+        return nullptr;
+    }
+};
+
+struct BufferEntry {
+    BufferDesc desc;
+    int frameIndex;
+};
+
+class ResourceBuilder {
+public:
+    ResourceBuilder() {}
+
+    ResourceBuilder& AddVertexBuffer(const std::string& name,const std::vector<Vertex>& vertices);
+    ResourceBuilder& AddIndexBuffer(const std::string& name,const std::vector<uint32_t>& indices);
+    ResourceBuilder& AddBuffer(const BufferDesc& bufferDesc);
+    ResourceBuilder& AddBindlessTextures(const std::string& name, const std::vector<std::string>& texturePaths,
+        Format format = Format::R8G8B8A8);
+
+    ResourceBuilder& AddTexture(const TextureDesc& textureDesc);
+    ResourceBuilder& AddSampler(const SamplerDesc& samplerDesc);
+    ResourceBuilder& AddMesh(const MeshHandle& meshHandle);
+
+    void BuildResources(Device* device, ResourceManager* resourceManager);
+private:
+    VkBufferUsageFlags GetVulkanUsageFlags(BufferBindFlags bindFlags);
+
+    bool RequiresPerFrameBuffers(BufferBindFlags bindFlags);
+    bool RequiresPerFrameTextures(TextureBindFlags bindFlags);
+
+    std::vector<TextureDesc> m_TextureDescs;
+    std::vector<BindlessTextureDesc> m_BindlessTextureDescs;
+    std::vector<BufferEntry> m_BufferDescs;
+    std::vector<SamplerDesc> m_SamplerDescs;
+    std::vector<MeshHandle> m_MeshHandles;
 };

@@ -204,88 +204,88 @@ void ResourceManager::CreateTextureSampler(std::vector<Texture>& textureContaine
 
 void ResourceManager::CreateVertexBuffer()
 {
-    VkDeviceSize bufferSize = sizeof(m_Vertices[0]) * m_Vertices.size();
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-
-    CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-
-    void* data;
-    vkMapMemory(m_Device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, m_Vertices.data(), (size_t)bufferSize);
-    vkUnmapMemory(m_Device->GetDevice(), stagingBufferMemory);
-
-    CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_VertexBuffer, m_VertexBufferMemory);
-    CopyBuffer(stagingBuffer, m_VertexBuffer, bufferSize);
-    vkDestroyBuffer(m_Device->GetDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(m_Device->GetDevice(), stagingBufferMemory, nullptr);
+   //VkDeviceSize bufferSize = sizeof(m_Vertices[0]) * m_Vertices.size();
+   //
+   //VkBuffer stagingBuffer;
+   //VkDeviceMemory stagingBufferMemory;
+   //
+   //CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+   //
+   //
+   //void* data;
+   //vkMapMemory(m_Device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+   //memcpy(data, m_Vertices.data(), (size_t)bufferSize);
+   //vkUnmapMemory(m_Device->GetDevice(), stagingBufferMemory);
+   //
+   //CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_VertexBuffer, m_VertexBufferMemory);
+   //CopyBuffer(stagingBuffer, m_VertexBuffer, bufferSize);
+   //vkDestroyBuffer(m_Device->GetDevice(), stagingBuffer, nullptr);
+   //vkFreeMemory(m_Device->GetDevice(), stagingBufferMemory, nullptr);
 }
 
 void ResourceManager::CreateMaterialBuffer()
 {
-    VkDeviceSize bufferSize = sizeof(GpuMaterial) * m_Meshes.size();
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer,
-        stagingBufferMemory);
-
-    void* data;
-    vkMapMemory(m_Device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    for (size_t i = 0; i < m_Meshes.size(); ++i) {
-        memcpy(static_cast<char*>(data) + i * sizeof(m_Meshes[0].material), &m_Meshes[i].material, sizeof(m_Meshes[0].material));
-    }
-    vkUnmapMemory(m_Device->GetDevice(), stagingBufferMemory);
-
-    CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        m_MaterialBuffer,
-        m_MaterialBufferMemory);
-
-    CopyBuffer(stagingBuffer, m_MaterialBuffer, bufferSize);
-
-    vkDestroyBuffer(m_Device->GetDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(m_Device->GetDevice(), stagingBufferMemory, nullptr);
+    //VkDeviceSize bufferSize = sizeof(GpuMaterial) * m_Meshes.size();
+    //
+    //VkBuffer stagingBuffer;
+    //VkDeviceMemory stagingBufferMemory;
+    //CreateBuffer(bufferSize,
+    //    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    //    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    //    stagingBuffer,
+    //    stagingBufferMemory);
+    //
+    //void* data;
+    //vkMapMemory(m_Device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    //for (size_t i = 0; i < m_Meshes.size(); ++i) {
+    //    memcpy(static_cast<char*>(data) + i * sizeof(m_Meshes[0].material), &m_Meshes[i].material, sizeof(m_Meshes[0].material));
+    //}
+    //vkUnmapMemory(m_Device->GetDevice(), stagingBufferMemory);
+    //
+    //CreateBuffer(bufferSize,
+    //    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    //    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    //    m_MaterialBuffer,
+    //    m_MaterialBufferMemory);
+    //
+    //CopyBuffer(stagingBuffer, m_MaterialBuffer, bufferSize);
+    //
+    //vkDestroyBuffer(m_Device->GetDevice(), stagingBuffer, nullptr);
+    //vkFreeMemory(m_Device->GetDevice(), stagingBufferMemory, nullptr);
 }
 
 void ResourceManager::CreateIndexBuffer()
 {
-    VkDeviceSize bufferSize = sizeof(m_Indices[0]) * m_Indices.size();
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-    void* data;
-    vkMapMemory(m_Device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, m_Indices.data(), (size_t)bufferSize);
-    vkUnmapMemory(m_Device->GetDevice(), stagingBufferMemory);
-
-    CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_IndexBuffer, m_IndexBufferMemory);
-    CopyBuffer(stagingBuffer, m_IndexBuffer, bufferSize);
-    vkDestroyBuffer(m_Device->GetDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(m_Device->GetDevice(), stagingBufferMemory, nullptr);
+    //VkDeviceSize bufferSize = sizeof(m_Indices[0]) * m_Indices.size();
+    //
+    //VkBuffer stagingBuffer;
+    //VkDeviceMemory stagingBufferMemory;
+    //CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    //
+    //void* data;
+    //vkMapMemory(m_Device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    //memcpy(data, m_Indices.data(), (size_t)bufferSize);
+    //vkUnmapMemory(m_Device->GetDevice(), stagingBufferMemory);
+    //
+    //CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_IndexBuffer, m_IndexBufferMemory);
+    //CopyBuffer(stagingBuffer, m_IndexBuffer, bufferSize);
+    //vkDestroyBuffer(m_Device->GetDevice(), stagingBuffer, nullptr);
+    //vkFreeMemory(m_Device->GetDevice(), stagingBufferMemory, nullptr);
 }
 
 void ResourceManager::CreateUniformBuffers()
 {
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-
-    m_UniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    m_UniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-    m_UniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_UniformBuffers[i], m_UniformBuffersMemory[i]);
-
-        vkMapMemory(m_Device->GetDevice(), m_UniformBuffersMemory[i], 0, bufferSize, 0, &m_UniformBuffersMapped[i]);
-    }
+    //VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    //
+    //m_UniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    //m_UniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    //m_UniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+    //
+    //for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    //    CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_UniformBuffers[i], m_UniformBuffersMemory[i]);
+    //
+    //    vkMapMemory(m_Device->GetDevice(), m_UniformBuffersMemory[i], 0, bufferSize, 0, &m_UniformBuffersMapped[i]);
+    //}
 }
 
 void ResourceManager::CreateLightingUniformBuffer()
@@ -421,17 +421,17 @@ void ResourceManager::CreateDescriptorSets(PipelineManager* pipelineManager) {
         //Update Universal Descriptor Set
         {
             VkDescriptorBufferInfo uboInfo{};
-            uboInfo.buffer = m_UniformBuffers[i];
+            uboInfo.buffer = GetBuffer("Uniform",i)->buffer;
             uboInfo.offset = 0;
             uboInfo.range = sizeof(UniformBufferObject);
 
             VkDescriptorBufferInfo vertexBufferInfo{};
-            vertexBufferInfo.buffer = m_VertexBuffer;
+            vertexBufferInfo.buffer = GetVertexBuffer();
             vertexBufferInfo.offset = 0;
             vertexBufferInfo.range = VK_WHOLE_SIZE;
 
             VkDescriptorBufferInfo materialBufferInfo{};
-            materialBufferInfo.buffer = m_MaterialBuffer;
+            materialBufferInfo.buffer = GetMaterialBuffer();
             materialBufferInfo.offset = 0;
             materialBufferInfo.range = VK_WHOLE_SIZE;
 
@@ -575,7 +575,7 @@ void ResourceManager::CreateLightingDescriptorSet(PipelineManager* pipelineManag
     descriptorWrites[3].pImageInfo = &depthInfo;
 
     VkDescriptorBufferInfo matrixBufferInfo{};
-    matrixBufferInfo.buffer = m_UniformBuffers[0]; // Use first frame's UBO
+    matrixBufferInfo.buffer = GetBuffer("Uniform",0)->buffer; // Use first frame's UBO
     matrixBufferInfo.offset = 0;
     matrixBufferInfo.range = sizeof(UniformBufferObject);
 
@@ -941,21 +941,21 @@ ResourceManager::~ResourceManager()
         vkDestroyImage(m_Device->GetDevice(), texture.image.image, nullptr);
         vkFreeMemory(m_Device->GetDevice(), texture.imageMemory, nullptr);
     }
+    for (auto& [name, bufferVector] : m_Buffers) {
+        for (Buffer* buffer : bufferVector) {
+            if (buffer != nullptr) {
+                if (buffer->mappedMemory != nullptr) {
+                    vkUnmapMemory(m_Device->GetDevice(), buffer->memory);
+                }
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vkDestroyBuffer(m_Device->GetDevice(), m_UniformBuffers[i], nullptr);
-		vkFreeMemory(m_Device->GetDevice(), m_UniformBuffersMemory[i], nullptr);
-	}
+                vkDestroyBuffer(m_Device->GetDevice(), buffer->buffer, nullptr);
+                vkFreeMemory(m_Device->GetDevice(), buffer->memory, nullptr);
+                delete buffer;
+            }
+        }
+    }
+    m_Buffers.clear();
 	vkDestroyDescriptorPool(m_Device->GetDevice(), m_DescriptorPool, nullptr);
-
-	vkDestroyBuffer(m_Device->GetDevice(), m_VertexBuffer, nullptr);
-	vkFreeMemory(m_Device->GetDevice(), m_VertexBufferMemory, nullptr);
-
-	vkDestroyBuffer(m_Device->GetDevice(), m_IndexBuffer, nullptr);
-	vkFreeMemory(m_Device->GetDevice(), m_IndexBufferMemory, nullptr);
-
-    vkDestroyBuffer(m_Device->GetDevice(), m_MaterialBuffer, nullptr);
-    vkFreeMemory(m_Device->GetDevice(), m_MaterialBufferMemory, nullptr);
 
     vkDestroyBuffer(m_Device->GetDevice(), m_LightingBuffer, nullptr);
     vkFreeMemory(m_Device->GetDevice(), m_LightingBufferMemory, nullptr);
@@ -1015,10 +1015,34 @@ void ResourceManager::Create(SwapChain* swapChain, PipelineManager* pipelineMana
 
 	// scene class should have loaded the vertex and index data
 
-    CreateVertexPullingBuffer();
-    CreateMaterialBuffer();
-	CreateIndexBuffer();
-	CreateUniformBuffers();
+    BufferDesc uniformBuffer{};
+    uniformBuffer.bindFlags = BufferBindFlags::UniformBuffer;
+    uniformBuffer.bufferSize = sizeof(UniformBufferObject);
+    uniformBuffer.name = "Uniform";
+
+    BufferDesc materialBuffer{};
+    materialBuffer.bindFlags = BufferBindFlags::StorageBuffer;
+    materialBuffer.bufferSize = m_Meshes.size() * sizeof(m_Meshes[0].material);
+    materialBuffer.structuredByteStride = sizeof(m_Meshes[0].material);
+    std::vector<GpuMaterial> materialData;
+    for(const auto& mesh:m_Meshes)
+    {
+        materialData.push_back(mesh.material);
+    }
+    materialBuffer.bufferData.data = materialData.data();
+    materialBuffer.bufferData.dataSize = m_Meshes.size();
+    materialBuffer.name = "Material";
+
+    ResourceBuilder builder{};
+    builder.AddBuffer(uniformBuffer)
+           .AddBuffer(materialBuffer)
+           .AddVertexBuffer("Vertex",m_Vertices)
+           .AddIndexBuffer("Index",m_Indices);
+
+    builder.BuildResources(m_Device, this);
+
+
+
     CreateLightingUniformBuffer();
 	CreateDescriptorPools();
     CreateDescriptorSets(pipelineManager);
@@ -1189,29 +1213,197 @@ void ResourceManager::TransitionImageLayoutInline(VkCommandBuffer commandBuffer,
 }
 
 void ResourceManager::CreateVertexPullingBuffer() {
-    VkDeviceSize bufferSize = sizeof(Vertex) * m_Vertices.size();
+    //VkDeviceSize bufferSize = sizeof(Vertex) * m_Vertices.size();
+    //
+    //VkBuffer stagingBuffer;
+    //VkDeviceMemory stagingBufferMemory;
+    //CreateBuffer(bufferSize,
+    //    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    //    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    //    stagingBuffer,
+    //    stagingBufferMemory);
+    //
+    //void* data;
+    //vkMapMemory(m_Device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+    //memcpy(data, m_Vertices.data(), bufferSize);
+    //vkUnmapMemory(m_Device->GetDevice(), stagingBufferMemory);
+    //
+    //CreateBuffer(bufferSize,
+    //    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    //    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    //    m_VertexBuffer,
+    //    m_VertexBufferMemory);
+    //
+    //CopyBuffer(stagingBuffer, m_VertexBuffer, bufferSize);
+    //
+    //vkDestroyBuffer(m_Device->GetDevice(), stagingBuffer, nullptr);
+    //vkFreeMemory(m_Device->GetDevice(), stagingBufferMemory, nullptr);
+}
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer,
-        stagingBufferMemory);
+ResourceBuilder& ResourceBuilder::AddVertexBuffer(const std::string& name, const std::vector<Vertex>& vertices)
+{
+    if (vertices.empty())
+    {
+        return *this;
+    }
+    BufferDesc bufferDesc{};
+    bufferDesc.bindFlags = BufferBindFlags::StorageBuffer;
+    bufferDesc.bufferSize = vertices.size()* sizeof(vertices[0]);
+    bufferDesc.structuredByteStride = sizeof(vertices[0]);
+    bufferDesc.bufferData.data = vertices.data();
+    bufferDesc.bufferData.dataSize = vertices.size();
+    bufferDesc.name = name;
 
-    void* data;
-    vkMapMemory(m_Device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, m_Vertices.data(), bufferSize);
-    vkUnmapMemory(m_Device->GetDevice(), stagingBufferMemory);
+    AddBuffer(bufferDesc);
 
-    CreateBuffer(bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        m_VertexBuffer,
-        m_VertexBufferMemory);
+    return *this;
+}
 
-    CopyBuffer(stagingBuffer, m_VertexBuffer, bufferSize);
+ResourceBuilder& ResourceBuilder::AddIndexBuffer(const std::string& name, const std::vector<uint32_t>& indices)
+{
+    if (indices.empty())
+    {
+        return *this;
+    }
+    BufferDesc bufferDesc{};
+    bufferDesc.bindFlags = BufferBindFlags::IndexBuffer;
+    bufferDesc.bufferSize = indices.size() * sizeof(indices[0]);
+    bufferDesc.structuredByteStride = sizeof(indices[0]);
+    bufferDesc.bufferData.data = indices.data();
+    bufferDesc.bufferData.dataSize = indices.size();
+    bufferDesc.name = name;
 
-    vkDestroyBuffer(m_Device->GetDevice(), stagingBuffer, nullptr);
-    vkFreeMemory(m_Device->GetDevice(), stagingBufferMemory, nullptr);
+    AddBuffer(bufferDesc);
+
+    return *this;
+}
+
+ResourceBuilder& ResourceBuilder::AddBuffer(const BufferDesc& bufferDesc)
+{
+    if (RequiresPerFrameBuffers(bufferDesc.bindFlags))
+    {
+        for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++)
+        {
+            // Keep original name, don't modify it
+            m_BufferDescs.push_back({ bufferDesc, frameIndex });
+        }
+    }
+    else
+    {
+        m_BufferDescs.push_back({ bufferDesc, -1 });
+    }
+    return *this;
+}
+
+ResourceBuilder& ResourceBuilder::AddBindlessTextures(const std::string& name, const std::vector<std::string>& texturePaths,
+    Format format)
+{
+    int index{ 0 };
+    for (const std::string& texturePath : texturePaths) {
+        BindlessTextureDesc bindlessTextureDesc{};
+        bindlessTextureDesc.name = name;
+        bindlessTextureDesc.path = texturePath;
+        bindlessTextureDesc.arrayIndex = index;
+        bindlessTextureDesc.format = format;
+
+        m_BindlessTextureDescs.push_back(std::move(bindlessTextureDesc));
+        ++index;
+    }
+    return *this;
+}
+
+ResourceBuilder& ResourceBuilder::AddTexture(const TextureDesc& textureDesc)
+{
+    m_TextureDescs.push_back(textureDesc);
+    return *this;
+}
+
+ResourceBuilder& ResourceBuilder::AddSampler(const SamplerDesc& samplerDesc)
+{
+    m_SamplerDescs.push_back(samplerDesc);
+    return *this;
+}
+
+void ResourceBuilder::BuildResources(Device* device, ResourceManager* resourceManager)
+{
+
+    for (const auto& entry : m_BufferDescs)
+    {
+
+        void* mapped{};
+
+        BufferDesc bufferDesc = entry.desc;
+
+        VkBuffer buffer;
+        VkDeviceMemory bufferMemory;
+
+        VkDeviceSize bufferSize = bufferDesc.bufferSize;
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+
+        if (EnumHasFlag(bufferDesc.bindFlags, BufferBindFlags::UniformBuffer)) {
+            resourceManager->CreateBuffer(bufferSize,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                buffer, bufferMemory);
+
+            vkMapMemory(device->GetDevice(), bufferMemory, 0, bufferSize, 0, &mapped);
+            if (bufferDesc.bufferData.data) {
+                memcpy(mapped, bufferDesc.bufferData.data, bufferSize);
+                vkUnmapMemory(device->GetDevice(), bufferMemory);
+            }
+        }
+        else
+        {
+            resourceManager->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+
+            void* data;
+            vkMapMemory(device->GetDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+            memcpy(data, bufferDesc.bufferData.data, (size_t)bufferSize);
+            vkUnmapMemory(device->GetDevice(), stagingBufferMemory);
+
+            resourceManager->CreateBuffer(bufferSize,
+                GetVulkanUsageFlags(bufferDesc.bindFlags),
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buffer, bufferMemory);
+            resourceManager->CopyBuffer(stagingBuffer, buffer, bufferSize);
+            vkDestroyBuffer(device->GetDevice(), stagingBuffer, nullptr);
+            vkFreeMemory(device->GetDevice(), stagingBufferMemory, nullptr);
+        }
+
+        resourceManager->AddBuffer(bufferDesc.name, new Buffer{ bufferDesc,buffer,bufferMemory,mapped,entry.frameIndex});
+    }
+
+    //for(const auto& BindlessTextureDesc:m_BindlessTextureDescs)
+}
+
+VkBufferUsageFlags ResourceBuilder::GetVulkanUsageFlags(BufferBindFlags bindFlags)
+{
+    VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    if (EnumHasFlag(bindFlags, BufferBindFlags::VertexBuffer)) {
+        usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    }
+    if (EnumHasFlag(bindFlags, BufferBindFlags::IndexBuffer)) {
+        usage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    }
+    if (EnumHasFlag(bindFlags, BufferBindFlags::UniformBuffer)) {
+        usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    }
+    if (EnumHasFlag(bindFlags, BufferBindFlags::StorageBuffer)) {
+        usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    }
+    return usage;
+}
+
+bool ResourceBuilder::RequiresPerFrameBuffers(BufferBindFlags bindFlags)
+{
+    return EnumHasFlag(bindFlags, BufferBindFlags::UniformBuffer);
+}
+
+bool ResourceBuilder::RequiresPerFrameTextures(TextureBindFlags bindFlags)
+{
+    return EnumHasFlag(bindFlags, TextureBindFlags::Write);
 }
